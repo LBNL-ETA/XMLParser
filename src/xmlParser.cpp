@@ -979,7 +979,7 @@ namespace XMLParser
         return eXMLErrorNone;
     }
 
-    XMLError XMLNode::writeToUTF8(const XMLCSTR filename, char nFormat)
+    XMLError XMLNode::writeToUTF8(XMLCSTR filename, char nFormat)
     {
         if(!d)
             return eXMLErrorNone;
