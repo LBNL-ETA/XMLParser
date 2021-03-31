@@ -15,16 +15,13 @@ endif()
 
 
 if (CMAKE_COMPILER_IS_GNUCC)
-    target_compile_options(${LIB_NAME} PRIVATE -Wall -Wextra -pedantic -Werror) 
-	set_source_files_properties(xmlParser.cpp PROPERTIES COMPILE_FLAGS -Wno-error)# Disable treating warnings as errors for XMLParser.  It is 3rd party library code
+    target_compile_options(${LIB_NAME} PRIVATE -Wall -Wextra -pedantic)
 endif()
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    target_compile_options(${LIB_NAME} PRIVATE -Wall -Wextra -pedantic -Werror )
-	set_source_files_properties(xmlParser.cpp PROPERTIES COMPILE_FLAGS -Wno-error) # Disable treating warnings as errors for XMLParser.  It is 3rd party library code
+    target_compile_options(${LIB_NAME} PRIVATE -Wall -Wextra -pedantic )
 endif()
 if (MSVC)
-    target_compile_options(${LIB_NAME} PRIVATE /W4 /WX)
-	set_source_files_properties(xmlParser.cpp PROPERTIES COMPILE_FLAGS /WX-) # Disable treating warnings as errors for XMLParser.  It is 3rd party library code
+    target_compile_options(${LIB_NAME} PRIVATE /W4)
 endif()
 
 
