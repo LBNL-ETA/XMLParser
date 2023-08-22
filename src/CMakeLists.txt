@@ -15,12 +15,16 @@ endif()
 
 
 if (CMAKE_COMPILER_IS_GNUCC)
+	message("GNU - xmlParser")
     target_compile_options(${LIB_NAME} PRIVATE -Wall -Wextra -pedantic)
 endif()
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+	message("Clang - xmlParser")
     target_compile_options(${LIB_NAME} PRIVATE -Wall -Wextra -pedantic )
 endif()
-if (MSVC)
+#if (MSVC)
+if(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+	message("MSVC - xmlParser")
     target_compile_options(${LIB_NAME} PRIVATE /W4)
 endif()
 
