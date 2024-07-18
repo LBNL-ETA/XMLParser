@@ -73,6 +73,8 @@
  ****************************************************************************
  */
 
+#include <sstream>
+#include <exception>
 // Component produces warning messages that were disabled only for this file.
 #pragma warning(disable : 4706)
 #pragma warning(disable : 4100)
@@ -743,6 +745,51 @@ namespace XMLParser
             exit(255);
         }
         return xnode;
+    }
+
+    XMLNode XMLNode::openFileHelperThrows(XMLCSTR filename, XMLCSTR tag)
+    {
+        // guess the value of the global parameter "characterEncoding"
+        // (the guess is based on the first 200 bytes of the file).
+        FILE * f;
+        errno_t err;
+        err = fopen_s(&f, filename, "rb");
+        if(err)
+        {
+            char buff[2000];
+            strerror_s(buff, err);
+            throw std::runtime_error(buff);
+        }
+        if(f)
+        {
+            char bb[205];
+            int l = (int)fread(bb, 1, 200, f);
+            XMLNode::setGlobalOptions(
+              XMLNode::guessCharEncoding(bb, l), 1, 1, 1);
+            fclose(f);
+        }
+
+        // parse the file
+        XMLResults results;
+        XMLNode node = XMLNode::parseFile(filename, tag, &results);
+
+        // display error message (if any)
+        if(results.error != eXMLErrorNone)
+        {
+            std::stringstream msg;
+
+            msg << "XML Parsing error in file: " << filename << " "
+                << XMLNode::getError(results.error) << " in line: " << results.nLine
+                << ", column: " << results.nColumn;
+
+            if(results.error == eXMLErrorFirstTagNotFound)
+            {
+                msg << " First Tag should be " << tag;
+            }
+
+            throw std::runtime_error(msg.str());
+        }
+        return node;
     }
 
     /////////////////////////////////////////////////////////////////////////

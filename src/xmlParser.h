@@ -310,6 +310,8 @@ namespace XMLParser {
          * @param tag the name of the first tag inside the XML file. If the tag parameter is omitted, this function returns a node that represents the head of the xml document including the declaration term (<? ... ?>).
          */
 
+        static XMLNode openFileHelperThrows(XMLCSTR filename, XMLCSTR tag = NULL);
+
         static XMLCSTR getError(XMLError error); ///< this gives you a user-friendly explanation of the parsing error
 
         /// Create an XML string starting from the current XMLNode.
