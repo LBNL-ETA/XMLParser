@@ -751,22 +751,22 @@ namespace XMLParser
     {
         // guess the value of the global parameter "characterEncoding"
         // (the guess is based on the first 200 bytes of the file).
-        FILE * f;
-        errno_t err;
-        err = fopen_s(&f, filename, "rb");
-        if(err)
-        {
-            char buff[2000];
-            strerror_s(buff, err);
-            throw std::runtime_error(buff);
-        }
+        FILE * f = xfopen(filename, _CXML("rb"));
         if(f)
         {
             char bb[205];
             int l = (int)fread(bb, 1, 200, f);
-            XMLNode::setGlobalOptions(
-              XMLNode::guessCharEncoding(bb, l), 1, 1, 1);
+            setGlobalOptions(guessCharEncoding(bb, l),
+                             guessWideCharChars,
+                             dropWhiteSpace,
+                             removeCommentsInMiddleOfText);
             fclose(f);
+        }
+        else
+        {
+            std::stringstream msg;
+            msg << "Error opening file: " << filename;
+            throw std::runtime_error(msg.str());
         }
 
         // parse the file
