@@ -1088,7 +1088,7 @@ namespace XMLParser
         if(lpszNew)
         {
             memcpy(lpszNew, lpszData, (cbData) * sizeof(XMLCHAR));
-            lpszNew[cbData] = (XMLCHAR)NULL;
+            lpszNew[cbData] = (XMLCHAR)'\0';
         }
         return lpszNew;
     }
