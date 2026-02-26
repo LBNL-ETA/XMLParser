@@ -25,4 +25,6 @@ if (MSVC)
 endif()
 
 
+target_compile_definitions(${LIB_NAME} PUBLIC XML_NO_WIDE_CHAR)
+
 target_compile_features(${LIB_NAME} PRIVATE cxx_std_17)
