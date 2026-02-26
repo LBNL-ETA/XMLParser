@@ -139,7 +139,6 @@
 //#define XML_NO_WIDE_CHAR
 
 #ifdef XML_NO_WIDE_CHAR
-#undef _XMLWINDOWS
 #undef _XMLWIDECHAR
 #endif
 
