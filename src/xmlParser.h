@@ -108,15 +108,6 @@
 
 #include <stdlib.h>
 
-#if defined(UNICODE) || defined(_UNICODE)
-// If you comment the next "define" line then the library will never "switch to" _UNICODE (wchar_t*) mode (16/32 bits per characters).
-// This is useful when you get error messages like:
-//    'XMLNode::openFileHelper' : cannot convert parameter 2 from 'const char [5]' to 'const wchar_t *'
-// The _XMLWIDECHAR preprocessor variable force the XMLParser library into either utf16/32-mode (the proprocessor variable
-// must be defined) or utf8-mode(the pre-processor variable must be undefined).
-#define _XMLWIDECHAR
-#endif
-
 #if defined(WIN32) || defined(UNDER_CE) || defined(_WIN32) || defined(WIN64) || defined(__BORLANDC__)
 // comment the next line if you are under windows and the compiler is not Microsoft Visual Studio (6.0 or .NET) or Borland
 #define _XMLWINDOWS
@@ -135,35 +126,17 @@
 #define XMLDLLENTRY
 #endif
 
-// uncomment the next line if you want no support for wchar_t* (no need for the <wchar.h> or <tchar.h> libraries anymore to compile)
-//#define XML_NO_WIDE_CHAR
-
-#ifdef XML_NO_WIDE_CHAR
-#undef _XMLWIDECHAR
-#endif
-
 #ifdef _XMLWINDOWS
 #include <tchar.h>
 #else
 #define XMLDLLENTRY
-#ifndef XML_NO_WIDE_CHAR
-#include <wchar.h> // to have 'wcsrtombs' for ANSI version
-                   // to have 'mbsrtowcs' for WIDECHAR version
-#endif
 #endif
 
 // Some common types for char set portable code
-#ifdef _XMLWIDECHAR
-    #define _CXML(c) L ## c
-    #define XMLCSTR const wchar_t *
-    #define XMLSTR  wchar_t *
-    #define XMLCHAR wchar_t
-#else
     #define _CXML(c) c
     #define XMLCSTR const char *
     #define XMLSTR  char *
     #define XMLCHAR char
-#endif
 #ifndef FALSE
     #define FALSE 0
 #endif /* FALSE */
@@ -327,7 +300,6 @@ namespace XMLParser {
         /**< If nFormat==0, no formatting is required otherwise this returns an user friendly XML string from a given element with appropriate white spaces and carriage returns.
          * If the global parameter "characterEncoding==encoding_UTF8", then the "encoding" parameter is ignored and always set to "utf-8".
          * If the global parameter "characterEncoding==encoding_ShiftJIS", then the "encoding" parameter is ignored and always set to "SHIFT-JIS".
-         * If "_XMLWIDECHAR=1", then the "encoding" parameter is ignored and always set to "utf-16".
          * If no "encoding" parameter is given the "ISO-8859-1" encoding is used. */
          /** @} */
 

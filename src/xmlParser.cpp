@@ -224,158 +224,25 @@ namespace XMLParser
 // Microsoft Visual Studio .NET, CC (sun compiler) and Borland C++.
 // If you plan to "port" the library to a new system/compiler, all you have to do is
 // to edit the following lines.
-#ifdef XML_NO_WIDE_CHAR
     char myIsTextWideChar(const void * b, int len)
     {
         return FALSE;
     }
-#else
-#    if defined(UNDER_CE) || !defined(_XMLWINDOWS)
-    char myIsTextWideChar(const void * b, int len)   // inspired by the Wine API: RtlIsTextUnicode
-    {
-#        ifdef sun
-        // for SPARC processors: wchar_t* buffers must always be alligned, otherwise it's a char*
-        // buffer.
-        if((((unsigned long)b) % sizeof(wchar_t)) != 0)
-            return FALSE;
-#        endif
-        const wchar_t * s = (const wchar_t *)b;
-
-        // buffer too small:
-        if(len < (int)sizeof(wchar_t))
-            return FALSE;
-
-        // odd length test
-        if(len & 1)
-            return FALSE;
-
-        /* only checks the first 256 characters */
-        len = mmin(256, len / sizeof(wchar_t));
-
-        // Check for the special byte order:
-        if(*((unsigned short *)s) == 0xFFFE)
-            return TRUE;   // IS_TEXT_UNICODE_REVERSE_SIGNATURE;
-        if(*((unsigned short *)s) == 0xFEFF)
-            return TRUE;   // IS_TEXT_UNICODE_SIGNATURE
-
-        // checks for ASCII characters in the UNICODE stream
-        int i, stats = 0;
-        for(i = 0; i < len; i++)
-            if(s[i] <= (unsigned short)255)
-                stats++;
-        if(stats > len / 2)
-            return TRUE;
-
-        // Check for UNICODE NULL chars
-        for(i = 0; i < len; i++)
-            if(!s[i])
-                return TRUE;
-
-        return FALSE;
-    }
-#    else
-    char myIsTextWideChar(const void * b, int l)
-    {
-        return (char)IsTextUnicode((CONST LPVOID)b, l, NULL);
-    }
-#    endif
-#endif
 
 #ifdef _XMLWINDOWS
     // for Microsoft Visual Studio 6.0 and Microsoft Visual Studio .NET and Borland C++ Builder 6.0
-#    ifdef _XMLWIDECHAR
-    wchar_t * myMultiByteToWideChar(const char * s, XMLNode::XMLCharEncoding ce)
-    {
-        int i;
-        if(ce == XMLNode::char_encoding_UTF8)
-            i = (int)MultiByteToWideChar(CP_UTF8, 0, s, -1, NULL, 0);
-        else
-            i = (int)MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, s, -1, NULL, 0);
-        if(i < 0)
-            return NULL;
-        wchar_t * d = (wchar_t *)malloc((i + 1) * sizeof(XMLCHAR));
-        if(ce == XMLNode::char_encoding_UTF8)
-            i = (int)MultiByteToWideChar(CP_UTF8, 0, s, -1, d, i);
-        else
-            i = (int)MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, s, -1, d, i);
-        d[i] = 0;
-        return d;
-    }
     static inline FILE * xfopen(XMLCSTR filename, XMLCSTR mode)
     {
-        return _wfopen(filename, mode);
-    }
-    static inline int xstrlen(XMLCSTR c)
-    {
-        return (int)wcslen(c);
-    }
-    static inline int xstrnicmp(XMLCSTR c1, XMLCSTR c2, int l)
-    {
-        return _wcsnicmp(c1, c2, l);
-    }
-    static inline int xstrncmp(XMLCSTR c1, XMLCSTR c2, int l)
-    {
-        return wcsncmp(c1, c2, l);
-    }
-    static inline int xstricmp(XMLCSTR c1, XMLCSTR c2)
-    {
-        return _wcsicmp(c1, c2);
-    }
-    static inline XMLSTR xstrstr(XMLCSTR c1, XMLCSTR c2)
-    {
-        return (XMLSTR)wcsstr(c1, c2);
-    }
-    static inline XMLSTR xstrcpy(XMLSTR c1, XMLCSTR c2)
-    {
-        return (XMLSTR)wcscpy(c1, c2);
-    }
-
-    char * myWideCharToMultiByte(const wchar_t * s)
-    {
-        UINT codePage = CP_ACP;
-        if(characterEncoding == XMLNode::char_encoding_UTF8)
-            codePage = CP_UTF8;
-        int i = (int)WideCharToMultiByte(codePage,   // code page
-                                         0,          // performance and mapping flags
-                                         s,          // wide-character string
-                                         -1,         // number of chars in string
-                                         NULL,       // buffer for new string
-                                         0,          // size of buffer
-                                         NULL,       // default for unmappable chars
-                                         NULL        // set when default char used
-        );
-        if(i < 0)
-            return NULL;
-        char * d = (char *)malloc(i + 1);
-        WideCharToMultiByte(codePage,   // code page
-                            0,          // performance and mapping flags
-                            s,          // wide-character string
-                            -1,         // number of chars in string
-                            d,          // buffer for new string
-                            i,          // size of buffer
-                            NULL,       // default for unmappable chars
-                            NULL        // set when default char used
-        );
-        d[i] = 0;
-        return d;
-    }
-#    else
-    static inline FILE * xfopen(XMLCSTR filename, XMLCSTR mode)
-    {
-#        ifdef _XMLWIDECHAR
-        return _wfopen(filename, mode);
-#        else
         FILE * file;
         if(fopen_s(&file, filename, mode) != 0)
             return NULL;
         return file;
-#        endif
     }
     static inline int xstrlen(XMLCSTR c)
     {
         return (int)strlen(c);
     }
-#        ifdef __BORLANDC__
+#    ifdef __BORLANDC__
     static inline int xstrnicmp(XMLCSTR c1, XMLCSTR c2, int l)
     {
         return strnicmp(c1, c2, l);
@@ -384,7 +251,7 @@ namespace XMLParser
     {
         return stricmp(c1, c2);
     }
-#        else
+#    else
     static inline int xstrnicmp(XMLCSTR c1, XMLCSTR c2, int l)
     {
         return _strnicmp(c1, c2, l);
@@ -393,7 +260,7 @@ namespace XMLParser
     {
         return _stricmp(c1, c2);
     }
-#        endif
+#    endif
     static inline int xstrncmp(XMLCSTR c1, XMLCSTR c2, int l)
     {
         return strncmp(c1, c2, l);
@@ -407,121 +274,12 @@ namespace XMLParser
         strcpy_s(c1, strlen(c2) + 1, c2);
         return c1;
     }
-#    endif
 #else
     // for gcc and CC
-#    ifdef XML_NO_WIDE_CHAR
     char * myWideCharToMultiByte(const wchar_t * s)
     {
         return NULL;
     }
-#    else
-    char * myWideCharToMultiByte(const wchar_t * s)
-    {
-        const wchar_t * ss = s;
-        int i = (int)wcsrtombs(NULL, &ss, 0, NULL);
-        if(i < 0)
-            return NULL;
-        char * d = (char *)malloc(i + 1);
-        wcsrtombs(d, &s, i, NULL);
-        d[i] = 0;
-        return d;
-    }
-#    endif
-#    ifdef _XMLWIDECHAR
-    wchar_t * myMultiByteToWideChar(const char * s, XMLNode::XMLCharEncoding ce)
-    {
-        const char * ss = s;
-        int i = (int)mbsrtowcs(NULL, &ss, 0, NULL);
-        if(i < 0)
-            return NULL;
-        wchar_t * d = (wchar_t *)malloc((i + 1) * sizeof(wchar_t));
-        mbsrtowcs(d, &s, i, NULL);
-        d[i] = 0;
-        return d;
-    }
-    int xstrlen(XMLCSTR c)
-    {
-        return wcslen(c);
-    }
-#        ifdef sun
-    // for CC
-#            include <widec.h>
-    static inline int xstrnicmp(XMLCSTR c1, XMLCSTR c2, int l)
-    {
-        return wsncasecmp(c1, c2, l);
-    }
-    static inline int xstrncmp(XMLCSTR c1, XMLCSTR c2, int l)
-    {
-        return wsncmp(c1, c2, l);
-    }
-    static inline int xstricmp(XMLCSTR c1, XMLCSTR c2)
-    {
-        return wscasecmp(c1, c2);
-    }
-#        else
-    static inline int xstrncmp(XMLCSTR c1, XMLCSTR c2, int l)
-    {
-        return wcsncmp(c1, c2, l);
-    }
-#            ifdef __linux__
-    // for gcc/linux
-    static inline int xstrnicmp(XMLCSTR c1, XMLCSTR c2, int l)
-    {
-        return wcsncasecmp(c1, c2, l);
-    }
-    static inline int xstricmp(XMLCSTR c1, XMLCSTR c2)
-    {
-        return wcscasecmp(c1, c2);
-    }
-#            else
-#                include <wctype.h>
-    // for gcc/non-linux (MacOS X 10.3, FreeBSD 6.0, NetBSD 3.0, OpenBSD 3.8, AIX 4.3.2, HP-UX 11,
-    // IRIX 6.5, OSF/1 5.1, Cygwin, mingw)
-    static inline int xstricmp(XMLCSTR c1, XMLCSTR c2)
-    {
-        wchar_t left, right;
-        do
-        {
-            left = towlower(*c1++);
-            right = towlower(*c2++);
-        } while(left && (left == right));
-        return (int)left - (int)right;
-    }
-    static inline int xstrnicmp(XMLCSTR c1, XMLCSTR c2, int l)
-    {
-        wchar_t left, right;
-        while(l--)
-        {
-            left = towlower(*c1++);
-            right = towlower(*c2++);
-            if((!left) || (left != right))
-                return (int)left - (int)right;
-        }
-        return 0;
-    }
-#            endif
-#        endif
-    static inline XMLSTR xstrstr(XMLCSTR c1, XMLCSTR c2)
-    {
-        return (XMLSTR)wcsstr(c1, c2);
-    }
-    static inline XMLSTR xstrcpy(XMLSTR c1, XMLCSTR c2)
-    {
-        return (XMLSTR)wcscpy(c1, c2);
-    }
-    static inline FILE * xfopen(XMLCSTR filename, XMLCSTR mode)
-    {
-        char * filenameAscii = myWideCharToMultiByte(filename);
-        FILE * f;
-        if(mode[0] == _CXML('r'))
-            f = fopen(filenameAscii, "rb");
-        else
-            f = fopen(filenameAscii, "wb");
-        free(filenameAscii);
-        return f;
-    }
-#    else
     static inline FILE * xfopen(XMLCSTR filename, XMLCSTR mode)
     {
         return fopen(filename, mode);
@@ -550,7 +308,6 @@ namespace XMLParser
     {
         return (XMLSTR)strcpy(c1, c2);
     }
-#    endif
     static inline int _strnicmp(const char * c1, const char * c2, int l)
     {
         return strncasecmp(c1, c2, l);
@@ -564,85 +321,7 @@ namespace XMLParser
 // These 6 functions are not used inside the XMLparser.
 // There are only here as "convenience" functions for the user.
 // If you don't need them, you can delete them without any trouble.
-#ifdef _XMLWIDECHAR
-#    ifdef _XMLWINDOWS
-    // for Microsoft Visual Studio 6.0 and Microsoft Visual Studio .NET and Borland C++ Builder 6.0
-    char xmltob(XMLCSTR t, char v)
-    {
-        if(t && (*t))
-            return (char)_wtoi(t);
-        return v;
-    }
-    int xmltoi(XMLCSTR t, int v)
-    {
-        if(t && (*t))
-            return _wtoi(t);
-        return v;
-    }
-    long long xmltol(XMLCSTR t, long long v)
-    {
-        if(t && (*t))
-            return _wtoi64(t);
-        return v;
-    }
-    double xmltof(XMLCSTR t, double v)
-    {
-        if(t && (*t))
-            swscanf(t, L"%lf", &v); /*v=_wtof(t);*/
-        return v;
-    }
-#    else
-#        ifdef sun
-    // for CC
-#            include <widec.h>
-    char xmltob(XMLCSTR t, char v)
-    {
-        if(t)
-            return (char)wstol(t, NULL, 10);
-        return v;
-    }
-    int xmltoi(XMLCSTR t, int v)
-    {
-        if(t)
-            return (int)wstol(t, NULL, 10);
-        return v;
-    }
-    long long xmltol(XMLCSTR t, long long v)
-    {
-        if(t)
-            return wstol(t, NULL, 10);
-        return v;
-    }
-#        else
-    // for gcc
-    char xmltob(XMLCSTR t, char v)
-    {
-        if(t)
-            return (char)wcstol(t, NULL, 10);
-        return v;
-    }
-    int xmltoi(XMLCSTR t, int v)
-    {
-        if(t)
-            return (int)wcstol(t, NULL, 10);
-        return v;
-    }
-    long long xmltol(XMLCSTR t, long long v)
-    {
-        if(t)
-            return wcstol(t, NULL, 10);
-        return v;
-    }
-#        endif
-    double xmltof(XMLCSTR t, double v)
-    {
-        if(t && (*t))
-            swscanf(t, L"%lf", &v); /*v=_wtof(t);*/
-        return v;
-    }
-#    endif
-#else
-#    ifdef _XMLWINDOWS
+#ifdef _XMLWINDOWS
     long long xmltol(XMLCSTR t, long long v)
     {
         if(t && (*t))
@@ -675,7 +354,6 @@ namespace XMLParser
             return atof(t);
         return v;
     }
-#endif
     XMLCSTR xmltoa(XMLCSTR t, XMLCSTR v)
     {
         if(t)
@@ -735,11 +413,7 @@ namespace XMLParser
             snprintf(message,
                      2000,
 #endif
-#ifdef _XMLWIDECHAR
-                        "XML Parsing error inside file '%S'.\n%S\nAt line %i, column %i.\n%s%S%s"
-#else
                      "XML Parsing error inside file '%s'.\n%s\nAt line %i, column %i.\n%s%s%s"
-#endif
                         ,
                         filename,
                         XMLNode::getError(pResults.error),
@@ -811,7 +485,6 @@ namespace XMLParser
 
     // You should normally not change anything below this point.
 
-#ifndef _XMLWIDECHAR
     // If "characterEncoding=ascii" then we assume that all characters have the same length of 1
     // byte. If "characterEncoding=UTF8" then the characters have different lengths (from 1 byte to
     // 4 bytes). If "characterEncoding=ShiftJIS" then the characters have different lengths (from 1
@@ -922,7 +595,6 @@ namespace XMLParser
     };
     static const char * XML_ByteTable = (const char *)
       XML_utf8ByteTable;   // the default is "characterEncoding=XMLNode::encoding_UTF8"
-#endif
 
 
     XMLNode XMLNode::emptyXMLNode;
@@ -987,23 +659,6 @@ namespace XMLParser
         FILE * f = xfopen(filename, _CXML("wb"));
         if(!f)
             return eXMLErrorCannotOpenWriteFile;
-#ifdef _XMLWIDECHAR
-        unsigned char h[2] = {0xFF, 0xFE};
-        if(!fwrite(h, 2, 1, f))
-        {
-            fclose(f);
-            return eXMLErrorCannotWriteFile;
-        }
-        if((!isDeclaration()) && ((d->lpszName) || (!getChildNode().isDeclaration())))
-        {
-            if(!fwrite(
-                 L"<?xml version=\"1.0\" encoding=\"utf-16\"?>\n", sizeof(wchar_t) * 40, 1, f))
-            {
-                fclose(f);
-                return eXMLErrorCannotWriteFile;
-            }
-        }
-#else
         if((!isDeclaration()) && ((d->lpszName) || (!getChildNode().isDeclaration())))
         {
             if(characterEncoding == char_encoding_UTF8)
@@ -1040,7 +695,6 @@ namespace XMLParser
                 }
             }
         }
-#endif
         int i;
         XMLSTR t = createXMLString(nFormat, &i);
         if(!fwrite(t, sizeof(XMLCHAR) * i, 1, f))
@@ -1086,13 +740,7 @@ namespace XMLParser
         // instead of the following 2 rows, you can use a tweaked copy of the
         // "myWideCharToMultiByte()" function:
         XMLNode::setGlobalOptions(XMLNode::char_encoding_UTF8);
-        // Needed to add the following #ifdef to handle the case where everything is in char
-        // so there is no need to convert from wchar_t
-#ifdef _XMLWIDECHAR
-        char * t = myWideCharToMultiByte(tt);
-#else
         char * t = tt;
-#endif
         free(tt);
         if(!fwrite(t, strlen(t), 1, f))
         {
@@ -1146,9 +794,6 @@ namespace XMLParser
                 }
                 entity++;
             } while(entity->s);
-#ifdef _XMLWIDECHAR
-            *(dest++) = *(source++);
-#else
             switch(XML_ByteTable[(unsigned char)ch])
             {
                 case 4:
@@ -1199,7 +844,6 @@ namespace XMLParser
                 case 1:
                     *(dest++) = *(source++);
             }
-#endif
         out_of_loop1:;
         }
         *dest = 0;
@@ -1225,14 +869,9 @@ namespace XMLParser
                 }
                 entity++;
             } while(entity->s);
-#ifdef _XMLWIDECHAR
-            r++;
-            source++;
-#else
             ch = XML_ByteTable[(unsigned char)ch];
             r += ch;
             source += ch;
-#endif
         out_of_loop1:;
         }
         return r;
@@ -1333,15 +972,10 @@ namespace XMLParser
             }
             else
             {
-#ifdef _XMLWIDECHAR
-                s++;
-                lo--;
-#else
                 j = XML_ByteTable[(unsigned char)*s];
                 s += j;
                 lo -= j;
                 ll += j - 1;
-#endif
             }
             ll++;
         }
@@ -1391,14 +1025,12 @@ namespace XMLParser
                             ss++;
                         }
                     }
-#ifndef _XMLWIDECHAR
                     if(j > 255)
                     {
                         free((void *)s);
                         pXML->error = eXMLErrorCharacterCodeAbove255;
                         return NULL;
                     }
-#endif
                     (*d++) = (XMLCHAR)j;
                     ss++;
                 }
@@ -1419,9 +1051,6 @@ namespace XMLParser
             }
             else
             {
-#ifdef _XMLWIDECHAR
-                *(d++) = *(ss++);
-#else
                 switch(XML_ByteTable[(unsigned char)*ss])
                 {
                     case 4:
@@ -1436,7 +1065,6 @@ namespace XMLParser
                     case 1:
                         *(d++) = *(ss++);
                 }
-#endif
             }
         }
         *d = 0;
@@ -1468,12 +1096,7 @@ namespace XMLParser
     static inline XMLCHAR getNextChar(XML * pXML)
     {
         XMLCHAR ch = pXML->lpXML[pXML->nIndex];
-#ifdef _XMLWIDECHAR
-        if(ch != 0)
-            pXML->nIndex++;
-#else
         pXML->nIndex += XML_ByteTable[(unsigned char)ch];
-#endif
         return ch;
     }
 
@@ -1909,11 +1532,7 @@ namespace XMLParser
                     lpszTemp = pCh;
                     break;
                 }
-#ifdef _XMLWIDECHAR
-                pCh++;
-#else
                 pCh += XML_ByteTable[(unsigned char)(*pCh)];
-#endif
             }
         }
         else
@@ -2572,44 +2191,6 @@ namespace XMLParser
         buf[l + 1] = 0;
         buf[l + 2] = 0;
         buf[l + 3] = 0;
-#ifdef _XMLWIDECHAR
-        if(guessWideCharChars)
-        {
-            if(!myIsTextWideChar(buf, l))
-            {
-                XMLNode::XMLCharEncoding ce = XMLNode::char_encoding_legacy;
-                if((buf[0] == 0xef) && (buf[1] == 0xbb) && (buf[2] == 0xbf))
-                {
-                    headerSz = 3;
-                    ce = XMLNode::char_encoding_UTF8;
-                }
-                XMLSTR b2 = myMultiByteToWideChar((const char *)(buf + headerSz), ce);
-                if(!b2)
-                {
-                    // todo: unable to convert
-                }
-                free(buf);
-                buf = (unsigned char *)b2;
-                headerSz = 0;
-            }
-            else
-            {
-                if((buf[0] == 0xef) && (buf[1] == 0xff))
-                    headerSz = 2;
-                if((buf[0] == 0xff) && (buf[1] == 0xfe))
-                    headerSz = 2;
-            }
-        }
-        else
-        {
-            if((buf[0] == 0xef) && (buf[1] == 0xff))
-                headerSz = 2;
-            if((buf[0] == 0xff) && (buf[1] == 0xfe))
-                headerSz = 2;
-            if((buf[0] == 0xef) && (buf[1] == 0xbb) && (buf[2] == 0xbf))
-                headerSz = 3;
-        }
-#else
         if(guessWideCharChars)
         {
             if(myIsTextWideChar(buf, l))
@@ -2618,15 +2199,7 @@ namespace XMLParser
                     headerSz = 2;
                 if((buf[0] == 0xff) && (buf[1] == 0xfe))
                     headerSz = 2;
-                    // Needed to add the following #ifdef to handle the case where everything is in
-                    // char so there is no need to convert to wchar_t
-#    ifdef _XMLWIDECHAR
-                char * b2 = myWideCharToMultiByte((const wchar_t *)(buf + headerSz));
-                free(buf);
-                buf = (unsigned char *)b2;
-#    else
                 buf += headerSz;
-#    endif
                 headerSz = 0;
             }
             else
@@ -2644,7 +2217,6 @@ namespace XMLParser
             if((buf[0] == 0xef) && (buf[1] == 0xbb) && (buf[2] == 0xbf))
                 headerSz = 3;
         }
-#endif
 
         if(!buf)
         {
@@ -3888,10 +3460,6 @@ namespace XMLParser
         guessWideCharChars = _guessWideCharChars;
         dropWhiteSpace = _dropWhiteSpace;
         removeCommentsInMiddleOfText = _removeCommentsInMiddleOfText;
-#ifdef _XMLWIDECHAR
-        if(_characterEncoding)
-            characterEncoding = _characterEncoding;
-#else
         switch(_characterEncoding)
         {
             case char_encoding_UTF8:
@@ -3918,16 +3486,12 @@ namespace XMLParser
             default:
                 return 1;
         }
-#endif
         return 0;
     }
 
     XMLNode::XMLCharEncoding
       XMLNode::guessCharEncoding(void * buf, int l, char useXMLEncodingAttribute)
     {
-#ifdef _XMLWIDECHAR
-        return (XMLCharEncoding)0;
-#else
         if(l < 25)
             return (XMLCharEncoding)0;
         if(guessWideCharChars && (myIsTextWideChar(buf, l)))
@@ -4013,7 +3577,6 @@ namespace XMLParser
             return char_encoding_GBK;
 
         return char_encoding_legacy;
-#endif
     }
 #undef XML_isSPACECHAR
 
@@ -4126,14 +3689,6 @@ namespace XMLParser
         // skip any extra characters (e.g. newlines or spaces)
         while(*data)
         {
-#ifdef _XMLWIDECHAR
-            if(*data > 255)
-            {
-                if(xe)
-                    *xe = eXMLErrorBase64DecodeIllegalCharacter;
-                return 0;
-            }
-#endif
             c = base64DecodeTable[(unsigned char)(*data)];
             if(c < 97)
                 size++;
@@ -4169,25 +3724,7 @@ namespace XMLParser
         unsigned char d, c;
         for(;;)
         {
-#ifdef _XMLWIDECHAR
-#    define BASE64DECODE_READ_NEXT_CHAR(c)                   \
-        do                                                   \
-        {                                                    \
-            if(data[i] > 255)                                \
-            {                                                \
-                c = 98;                                      \
-                break;                                       \
-            }                                                \
-            c = base64DecodeTable[(unsigned char)data[i++]]; \
-        } while(c == 97);                                    \
-        if(c == 98)                                          \
-        {                                                    \
-            if(xe)                                           \
-                *xe = eXMLErrorBase64DecodeIllegalCharacter; \
-            return 0;                                        \
-        }
-#else
-#    define BASE64DECODE_READ_NEXT_CHAR(c)                   \
+#define BASE64DECODE_READ_NEXT_CHAR(c)                   \
         do                                                   \
         {                                                    \
             c = base64DecodeTable[(unsigned char)data[i++]]; \
@@ -4198,7 +3735,6 @@ namespace XMLParser
                 *xe = eXMLErrorBase64DecodeIllegalCharacter; \
             return 0;                                        \
         }
-#endif
 
             BASE64DECODE_READ_NEXT_CHAR(c)
             if(c == 99)
