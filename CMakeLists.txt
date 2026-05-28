@@ -4,7 +4,7 @@ if(TARGET xmlParser)
     return() # The project has already been built.
 endif()
 
-project( xmlParser VERSION 1.0.4 LANGUAGES CXX )
+project( xmlParser VERSION 1.0.5 LANGUAGES CXX )
 set(LIB_NAME ${PROJECT_NAME})
 
 if(NOT "${CMAKE_CXX_STANDARD}")
