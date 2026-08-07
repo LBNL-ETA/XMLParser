@@ -591,7 +591,7 @@ namespace XMLParser {
         XMLClear *addClear_priv(int, XMLSTR, XMLCSTR, XMLCSTR, int);
         void emptyTheNode(char force);
         static inline XMLElementPosition findPosition(XMLNodeData *d, int index, XMLElementType xtype);
-        static int CreateXMLStringR(XMLNodeData *pEntry, XMLSTR lpszMarker, int nFormat);
+        static void CreateXMLStringR(XMLNodeData *pEntry, struct XMLStringBuilder &builder, int nFormat);
         static int removeOrderElement(XMLNodeData *d, XMLElementType t, int index);
         static void exactMemory(XMLNodeData *d);
         static int detachFromParent(XMLNodeData *d);

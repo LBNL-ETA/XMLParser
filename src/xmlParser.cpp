@@ -2234,16 +2234,82 @@ namespace XMLParser
         while(l--)
             *(dest++) = c;
     }
+    // Growing output buffer for XML serialisation. The serialiser used to walk the whole
+    // tree twice, once to measure the exact output size and once to fill the buffer, which
+    // meant every name, text value and attribute was scanned twice. Appending into a buffer
+    // that grows geometrically removes the measuring pass entirely.
+    struct XMLStringBuilder
+    {
+        XMLSTR data;
+        int len;
+        int cap;
+
+        void reserve(int extra)
+        {
+            if(len + extra + 1 <= cap)
+            {
+                return;
+            }
+            int newCap = cap ? cap : 1024;
+            while(newCap < len + extra + 1)
+            {
+                newCap *= 2;
+            }
+            data = (XMLSTR)realloc(data, (size_t)newCap * sizeof(XMLCHAR));
+            cap = newCap;
+        }
+
+        void putChar(XMLCHAR chr)
+        {
+            reserve(1);
+            data[len++] = chr;
+        }
+
+        void putRaw(XMLCSTR src, int count)
+        {
+            if(count <= 0)
+            {
+                return;
+            }
+            reserve(count);
+            memcpy(data + len, src, (size_t)count * sizeof(XMLCHAR));
+            len += count;
+        }
+
+        void putIndent(int count)
+        {
+            if(count <= 0)
+            {
+                return;
+            }
+            reserve(count);
+            charmemset(data + len, INDENTCHAR, count);
+            len += count;
+        }
+
+        // Escapes into the buffer. The escaped length must be known to size the buffer, so
+        // the value is scanned once here and once by toXMLUnSafe, as it was before.
+        void putEscaped(XMLCSTR src, int escapedLength)
+        {
+            if(escapedLength <= 0)
+            {
+                return;
+            }
+            reserve(escapedLength);
+            ToXMLStringTool::toXMLUnSafe(data + len, src);
+            len += escapedLength;
+        }
+    };
+
     // private:
     // Creates an user friendly XML string from a given element with
     // appropriate white space and carriage returns.
     //
     // This recurses through all subnodes then adds contents of the nodes to the
     // string.
-    int XMLNode::CreateXMLStringR(XMLNodeData * pEntry, XMLSTR lpszMarker, int nFormat)
+    void XMLNode::CreateXMLStringR(XMLNodeData * pEntry, XMLStringBuilder & builder, int nFormat)
     {
-        int nResult = 0;
-        int cb = nFormat < 0 ? 0 : nFormat;
+        int indent = nFormat < 0 ? 0 : nFormat;
         int cbElement;
         int nChildFormat = -1;
         int nElementI = pEntry->nChild + pEntry->nText + pEntry->nClear;
@@ -2261,88 +2327,56 @@ namespace XMLParser
         if(cbElement)
         {
             // "<elementname "
-            if(lpszMarker)
-            {
-                if(cb)
-                    charmemset(lpszMarker, INDENTCHAR, cb);
-                nResult = cb;
-                lpszMarker[nResult++] = _CXML('<');
-                if(pEntry->isDeclaration)
-                    lpszMarker[nResult++] = _CXML('?');
-                xstrcpy(&lpszMarker[nResult], pEntry->lpszName);
-                nResult += cbElement;
-                lpszMarker[nResult++] = _CXML(' ');
-            }
-            else
-            {
-                nResult += cbElement + 2 + cb;
-                if(pEntry->isDeclaration)
-                    nResult++;
-            }
+            builder.putIndent(indent);
+            builder.putChar(_CXML('<'));
+            if(pEntry->isDeclaration)
+                builder.putChar(_CXML('?'));
+            builder.putRaw(pEntry->lpszName, cbElement);
+            builder.putChar(_CXML(' '));
 
             // Enumerate attributes and add them to the string
             XMLAttribute * pAttr = pEntry->pAttribute;
             for(i = 0; i < pEntry->nAttribute; i++)
             {
                 // "Attrib
-                cb = (int)LENSTR(pAttr->lpszName);
-                if(cb)
+                const int cbName = (int)LENSTR(pAttr->lpszName);
+                if(cbName)
                 {
-                    if(lpszMarker)
-                        xstrcpy(&lpszMarker[nResult], pAttr->lpszName);
-                    nResult += cb;
+                    builder.putRaw(pAttr->lpszName, cbName);
                     // "Attrib=Value "
                     if(pAttr->lpszValue)
                     {
-                        cb = (int)ToXMLStringTool::lengthXMLString(pAttr->lpszValue);
-                        if(lpszMarker)
-                        {
-                            lpszMarker[nResult] = _CXML('=');
-                            lpszMarker[nResult + 1] = _CXML('"');
-                            if(cb)
-                                ToXMLStringTool::toXMLUnSafe(&lpszMarker[nResult + 2],
-                                                             pAttr->lpszValue);
-                            lpszMarker[nResult + cb + 2] = _CXML('"');
-                        }
-                        nResult += cb + 3;
+                        const int cbValue
+                          = (int)ToXMLStringTool::lengthXMLString(pAttr->lpszValue);
+                        builder.putChar(_CXML('='));
+                        builder.putChar(_CXML('"'));
+                        builder.putEscaped(pAttr->lpszValue, cbValue);
+                        builder.putChar(_CXML('"'));
                     }
-                    if(lpszMarker)
-                        lpszMarker[nResult] = _CXML(' ');
-                    nResult++;
+                    builder.putChar(_CXML(' '));
                 }
                 pAttr++;
             }
 
             if(pEntry->isDeclaration)
             {
-                if(lpszMarker)
-                {
-                    lpszMarker[nResult - 1] = _CXML('?');
-                    lpszMarker[nResult] = _CXML('>');
-                }
-                nResult++;
+                // Overwrite the trailing space of the start tag.
+                builder.data[builder.len - 1] = _CXML('?');
+                builder.putChar(_CXML('>'));
                 if(nFormat != -1)
-                {
-                    if(lpszMarker)
-                        lpszMarker[nResult] = _CXML('\n');
-                    nResult++;
-                }
+                    builder.putChar(_CXML('\n'));
             }
             else
                 // If there are child nodes we need to terminate the start tag
                 if(nElementI)
                 {
-                    if(lpszMarker)
-                        lpszMarker[nResult - 1] = _CXML('>');
+                    builder.data[builder.len - 1] = _CXML('>');
                     if(nFormat >= 0)
-                    {
-                        if(lpszMarker)
-                            lpszMarker[nResult] = _CXML('\n');
-                        nResult++;
-                    }
+                        builder.putChar(_CXML('\n'));
                 }
                 else
-                    nResult--;
+                    // Drop the trailing space; shorthand notation closes the tag below.
+                    builder.len--;
         }
 
         // Calculate the child format for when we recurse.  This is used to
@@ -2365,25 +2399,18 @@ namespace XMLParser
                 case eNodeText: {
                     // "Text"
                     XMLCSTR pChild = pEntry->pText[j >> 2];
-                    cb = (int)ToXMLStringTool::lengthXMLString(pChild);
-                    if(cb)
+                    const int cbText = (int)ToXMLStringTool::lengthXMLString(pChild);
+                    if(cbText)
                     {
                         if(nFormat >= 0)
                         {
-                            if(lpszMarker)
-                            {
-                                charmemset(&lpszMarker[nResult], INDENTCHAR, nFormat + 1);
-                                ToXMLStringTool::toXMLUnSafe(&lpszMarker[nResult + nFormat + 1],
-                                                             pChild);
-                                lpszMarker[nResult + nFormat + 1 + cb] = _CXML('\n');
-                            }
-                            nResult += cb + nFormat + 2;
+                            builder.putIndent(nFormat + 1);
+                            builder.putEscaped(pChild, cbText);
+                            builder.putChar(_CXML('\n'));
                         }
                         else
                         {
-                            if(lpszMarker)
-                                ToXMLStringTool::toXMLUnSafe(&lpszMarker[nResult], pChild);
-                            nResult += cb;
+                            builder.putEscaped(pChild, cbText);
                         }
                     }
                     break;
@@ -2393,59 +2420,33 @@ namespace XMLParser
                 case eNodeClear: {
                     XMLClear * pChild = pEntry->pClear + (j >> 2);
                     // "OpenTag"
-                    cb = (int)LENSTR(pChild->lpszOpenTag);
-                    if(cb)
+                    const int cbOpen = (int)LENSTR(pChild->lpszOpenTag);
+                    if(cbOpen)
                     {
                         if(nFormat != -1)
-                        {
-                            if(lpszMarker)
-                            {
-                                charmemset(&lpszMarker[nResult], INDENTCHAR, nFormat + 1);
-                                xstrcpy(&lpszMarker[nResult + nFormat + 1], pChild->lpszOpenTag);
-                            }
-                            nResult += cb + nFormat + 1;
-                        }
-                        else
-                        {
-                            if(lpszMarker)
-                                xstrcpy(&lpszMarker[nResult], pChild->lpszOpenTag);
-                            nResult += cb;
-                        }
+                            builder.putIndent(nFormat + 1);
+                        builder.putRaw(pChild->lpszOpenTag, cbOpen);
                     }
 
                     // "OpenTag Value"
-                    cb = (int)LENSTR(pChild->lpszValue);
-                    if(cb)
-                    {
-                        if(lpszMarker)
-                            xstrcpy(&lpszMarker[nResult], pChild->lpszValue);
-                        nResult += cb;
-                    }
+                    const int cbValue = (int)LENSTR(pChild->lpszValue);
+                    if(cbValue)
+                        builder.putRaw(pChild->lpszValue, cbValue);
 
                     // "OpenTag Value CloseTag"
-                    cb = (int)LENSTR(pChild->lpszCloseTag);
-                    if(cb)
-                    {
-                        if(lpszMarker)
-                            xstrcpy(&lpszMarker[nResult], pChild->lpszCloseTag);
-                        nResult += cb;
-                    }
+                    const int cbClose = (int)LENSTR(pChild->lpszCloseTag);
+                    if(cbClose)
+                        builder.putRaw(pChild->lpszCloseTag, cbClose);
 
                     if(nFormat != -1)
-                    {
-                        if(lpszMarker)
-                            lpszMarker[nResult] = _CXML('\n');
-                        nResult++;
-                    }
+                        builder.putChar(_CXML('\n'));
                     break;
                 }
 
                 // Element nodes
                 case eNodeChild: {
                     // Recursively add child nodes
-                    nResult += CreateXMLStringR(pEntry->pChild[j >> 2].d,
-                                                lpszMarker ? lpszMarker + nResult : 0,
-                                                nChildFormat);
+                    CreateXMLStringR(pEntry->pChild[j >> 2].d, builder, nChildFormat);
                     break;
                 }
                 default:
@@ -2460,56 +2461,27 @@ namespace XMLParser
             if(nElementI)
             {
                 // "</elementname>\0"
-                if(lpszMarker)
-                {
-                    if(nFormat >= 0)
-                    {
-                        charmemset(&lpszMarker[nResult], INDENTCHAR, nFormat);
-                        nResult += nFormat;
-                    }
+                if(nFormat >= 0)
+                    builder.putIndent(nFormat);
 
-                    lpszMarker[nResult] = _CXML('<');
-                    lpszMarker[nResult + 1] = _CXML('/');
-                    nResult += 2;
-                    xstrcpy(&lpszMarker[nResult], pEntry->lpszName);
-                    nResult += cbElement;
-
-                    lpszMarker[nResult] = _CXML('>');
-                    if(nFormat == -1)
-                        nResult++;
-                    else
-                    {
-                        lpszMarker[nResult + 1] = _CXML('\n');
-                        nResult += 2;
-                    }
-                }
-                else
-                {
-                    if(nFormat >= 0)
-                        nResult += cbElement + 4 + nFormat;
-                    else if(nFormat == -1)
-                        nResult += cbElement + 3;
-                    else
-                        nResult += cbElement + 4;
-                }
+                builder.putChar(_CXML('<'));
+                builder.putChar(_CXML('/'));
+                builder.putRaw(pEntry->lpszName, cbElement);
+                builder.putChar(_CXML('>'));
+                if(nFormat != -1)
+                    builder.putChar(_CXML('\n'));
             }
             else
             {
                 // If there are no children we can use shorthand XML notation -
                 // "<elementname/>"
                 // "/>\0"
-                if(lpszMarker)
-                {
-                    lpszMarker[nResult] = _CXML('/');
-                    lpszMarker[nResult + 1] = _CXML('>');
-                    if(nFormat != -1)
-                        lpszMarker[nResult + 2] = _CXML('\n');
-                }
-                nResult += nFormat == -1 ? 2 : 3;
+                builder.putChar(_CXML('/'));
+                builder.putChar(_CXML('>'));
+                if(nFormat != -1)
+                    builder.putChar(_CXML('\n'));
             }
         }
-
-        return nResult;
     }
 
 #undef LENSTR
@@ -2532,22 +2504,19 @@ namespace XMLParser
             return NULL;
         }
 
-        XMLSTR lpszResult = NULL;
-        int cbStr;
-
-        // Recursively Calculate the size of the XML string
         if(!dropWhiteSpace)
             nFormat = 0;
         nFormat = nFormat ? 0 : -1;
-        cbStr = CreateXMLStringR(d, 0, nFormat);
-        // Alllocate memory for the XML string + the NULL terminator and
-        // create the recursively XML string.
-        lpszResult = (XMLSTR)malloc((cbStr + 1) * sizeof(XMLCHAR));
-        CreateXMLStringR(d, lpszResult, nFormat);
-        lpszResult[cbStr] = _CXML('\0');
+
+        // Single pass: the buffer grows as the tree is walked, so the output is produced
+        // without a preceding pass to measure it.
+        XMLStringBuilder builder{NULL, 0, 0};
+        builder.reserve(1024);
+        CreateXMLStringR(d, builder, nFormat);
+        builder.data[builder.len] = _CXML('\0');
         if(pnSize)
-            *pnSize = cbStr;
-        return lpszResult;
+            *pnSize = builder.len;
+        return builder.data;
     }
 
     int XMLNode::detachFromParent(XMLNodeData * d)
